@@ -1,6 +1,8 @@
 # discord-translate
 *You have to use Korean in moderation. This is a paid service, so if we use Korean, we lose money.*
 
+---
+
 Discord message translator using AWS Translate and AWS Comprehend.
 
 # Setup
