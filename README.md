@@ -24,7 +24,7 @@ Discord message translator using AWS Translate and AWS Comprehend.
 
 # Permissions
 
-Users with `ADMINISTRATOR` permission or those that have the role that's set in `role_config.json`->`bot_controller_role` can do privileged actions (set languages, groups, etc).
+Users with `ADMINISTRATOR` permission or those that have the role that's set in `role_config.json -> bot_controller_role` can do privileged actions (set languages, groups, etc).
 
 # Context menu commands
 
