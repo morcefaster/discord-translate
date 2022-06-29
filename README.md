@@ -18,7 +18,9 @@ Discord message translator using AWS Translate and AWS Comprehend.
 
 2. Get your AWS IAM credentials into a shared credential file. [Guide](https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/loading-node-credentials-shared.html)
 
-3. Run `node index.js`
+3. Run `node deploy_commands.js` to deploy the commands to your guild.
+
+4. Run `node index.js` to start the bot.
 
 # Permissions
 
