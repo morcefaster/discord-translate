@@ -59,4 +59,4 @@ Users with `ADMINISTRATOR` permission or those that have the role that's set in 
   * [Privileged] Turn off all automatic translations (mirror, channel, role translate)
 
 * /tl_enable
-  * [Privileged] Turn on the automatic translations back on.
+  * [Privileged] Turn the automatic translations back on.
