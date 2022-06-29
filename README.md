@@ -24,6 +24,13 @@ Discord message translator using AWS Translate and AWS Comprehend.
 
 Users with `ADMINISTRATOR` permission or those that have the role that's set in `role_config.json`->`bot_controller_role` can do privileged actions (set languages, groups, etc).
 
+# Context menu commands
+
+* Detect language
+  * Detects the dominant language of the message using AWS Comprehend.
+* Translate to [LANGUAGE]
+  * Translates the message to the selected target language.
+
 # Commands
 
 * /translate [text] [target] 
