@@ -12,9 +12,12 @@ Discord message translator using AWS Translate and AWS Comprehend.
 {
   "clientId": "YOUR_CLIENT_ID",
   "guildId": "YOUR_SERVER_ID",
-  "token": "YOUR_SECRET_TOKEN"
+  "token": "YOUR_SECRET_TOKEN",
+  "s3bucket": "S3_BUCKET_NAME"
 }
 ```
+
+Note that S3 bucket is assumed to be in eu-central-1 region. 
 
 2. Get your AWS IAM credentials into a shared credential file. [Guide](https://docs.aws.amazon.com/sdk-for-javascript/v3/developer-guide/loading-node-credentials-shared.html)
 
