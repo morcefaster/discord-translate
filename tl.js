@@ -1,29 +1,39 @@
 import { TranslateClient, TranslateTextCommand } from "@aws-sdk/client-translate";
 import { ComprehendClient, DetectDominantLanguageCommand } from "@aws-sdk/client-comprehend";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { createRequire } from "module";
-import { MessageEmbed } from 'discord.js';
+import { MessageEmbed, MessageAttachment } from 'discord.js';
+import axios from 'axios';
 import * as fs from 'fs';
+import gm from 'gm';
 
 const require = createRequire(import.meta.url);
 const languages = require('./languages.json');
 const roleConfig = require('./role_config.json');
+const appConfig = require('./config.json');
 
 
 const CHANNEL_CONFIG_FILENAME = './channel_config.json';
-const LANG_THRESHOLD = 0.7;
+const AVATAR_DB_FILENAME = './avatars.json';
 var cfg = require(CHANNEL_CONFIG_FILENAME);
+var avatars = require(AVATAR_DB_FILENAME);
 
-const tlClient = new TranslateClient({ region: "us-east-1" });
-const chClient = new ComprehendClient({ region: "us-east-1" });
+const LANG_THRESHOLD = 0.7;
+const tlClient = new TranslateClient({ region: "eu-central-1" });
+const chClient = new ComprehendClient({ region: "eu-central-1" });
+const s3Client = new S3Client({ region: "eu-central-1" });
 
 
 export async function saveConfig() {
-    
     await fs.promises.writeFile(CHANNEL_CONFIG_FILENAME, JSON.stringify(cfg));
 }
 
 export function readConfig() {
     cfg = require(CHANNEL_CONFIG_FILENAME);
+}
+
+export async function saveAvatars() {
+    await fs.promises.writeFile(AVATAR_DB_FILENAME, JSON.stringify(avatars));
 }
 
 export async function validatePrivileges(interaction) {
@@ -116,12 +126,12 @@ export async function configMirror(interaction) {
     var enabled = interaction.options.getString("enabled");
     var translate = interaction.options.getString("translate");
     cfg.mirror = (enabled.toLowerCase() === "true");
-    cfg.mirror_tl = (translate.toLowerCase() === "true");
-    cfg.mirror_mode = interaction.options.getString("mode");
+    cfg.mirrorTl = (translate.toLowerCase() === "true");
+    cfg.mirrorMode = interaction.options.getString("mode");
     await saveConfig();
     
     await interaction.reply({
-        content: `Mirroring is set to [${cfg.mirror}], translate [${translate}], mode [${cfg.mirror_mode}].`
+        content: `Mirroring is set to [${cfg.mirror}], translate [${translate}], mode [${cfg.mirrorMode}].`
     });
 }
 
@@ -195,11 +205,6 @@ export async function detectLanguage(text) {
 }
 
 export async function translateMessage(interaction) {
-    if (!cfg.enabled) {
-        await interaction.reply({ content: "The translator is currently disabled.", ephemeral: true });
-        return;
-    }
-
     var text = interaction.options.getString("text");
     var target = interaction.options.getString("target");
     var lc = languages.find(l => l.code.toLowerCase() === target || l.name.toLowerCase() === target);
@@ -219,7 +224,7 @@ export async function roleTranslationConfig(interaction) {
 
     var enable = interaction.options.getString("enabled");
 
-    cfg.role_tl = (enable === 'true');
+    cfg.roleTl = (enable === 'true');
     await saveConfig();
 
     await interaction.reply({
@@ -255,13 +260,13 @@ export async function forceLanguageConfig(interaction) {
 
 export async function translate(text, target) {
     var params = {
-        Text: text,
+        Text: prepareSpecial(text),
         TargetLanguageCode: target,
         SourceLanguageCode: "auto"
     };
     var com = new TranslateTextCommand(params);
     var translatedText = await tlClient.send(com);
-    return translatedText.TranslatedText;
+    return unwrapSpecial(translatedText.TranslatedText);
 }
 
 
@@ -285,8 +290,9 @@ export async function getHook(channel, user) {
     return wh;
 }
 
-export async function enforceLanguage(message) {
+export async function enforceLanguage(message, userAvatar) {
     if (!cfg.enabled) return;
+
     var cc = getChannelConfig(message.channel);
     if (!cc.enforceLanguage) {
         return;
@@ -294,16 +300,15 @@ export async function enforceLanguage(message) {
     var textLang = await detectLanguage(message.content);
     if (textLang && textLang.Score > LANG_THRESHOLD && textLang.LanguageCode !== cc.language) {
         var text = await translate(message.content, cc.language);
-        text = restoreMentions(text);
         var langName = languages.find(l => l.code === textLang.LanguageCode).name;
-        await sendText(message.channel, text, message.author, { text: `Translated from ${langName}` });
+        await sendText(message.channel, text, message.member, userAvatar, { text: `Translated from ${langName}` });
     }
 }
 
-export async function roleTranslate(message) {
+export async function roleTranslate(message, userAvatar) {
     if (!cfg.enabled) return;
 
-    if (!cfg.role_tl) return;
+    if (!cfg.roleTl) return;
 
     var textLang = await detectLanguage(message.content);
     if (!textLang || textLang.Score <= LANG_THRESHOLD) {
@@ -318,14 +323,13 @@ export async function roleTranslate(message) {
     for (var rt of translateTo) {
         if (textLang.LanguageCode !== rt.language) {
             var text = await translate(message.content, rt.language);
-            text = restoreMentions(text);
             var langName = languages.find(l => l.code === textLang.LanguageCode).name;
-            await sendText(message.channel, text, message.author, { text: `Translated from ${langName}` });
+            await sendText(message.channel, text, message.member, userAvatar, { text: `Translated from ${langName}` });
         }
     }
 }
 
-export async function mirrorMessage(message, client) {
+export async function mirrorMessage(message, client, userAvatar) {
     if (!cfg.enabled || !cfg.mirror) return;
 
     var cc = getChannelConfig(message.channel);
@@ -333,31 +337,31 @@ export async function mirrorMessage(message, client) {
         return;
     }
 
-    var textLang = cfg.mirror_tl ? await detectLanguage(message.content) : null;
+    var textLang = cfg.mirrorTl ? await detectLanguage(message.content) : null;
     var channels = cfg.channels.filter(c => c.groupName === cc.groupName && c.id !== cc.id);
 
     var origin = `Mirrored from channel ${message.channel.name}.`;
+
     for (var ch of channels) {
         var text = message.content;
-        if (cfg.mirror_tl) {
+        if (cfg.mirrorTl) {
             if (textLang.Score > LANG_THRESHOLD && ch.language !== textLang.LanguageCode) {
                 text = await translate(message.content, ch.language);
-                text = restoreMentions(text);
                 var langName = languages.find(l => l.code === textLang.LanguageCode).name;
                 origin = `Translated from ${langName}`;
             }
         }
 
         var channel = await client.channels.fetch(ch.id);
-        await sendText(channel, text, message.author, { text: origin });
+        await sendText(channel, text, message.member, userAvatar, { text: origin });
     }
 }
 
-export async function sendText(channel, text, user, meta) {
-    if (cfg.mirror_mode === "embed") {
+export async function sendText(channel, text, user, userAvatar, meta) {
+    if (cfg.mirrorMode === "embed") {
         sendTextEmbed(channel, text, user, meta);
     } else {
-        sendTextWebhook(channel, text, user);
+        sendTextWebhook(channel, text, user, userAvatar);
     }
 }
 
@@ -366,31 +370,117 @@ export async function sendTextEmbed(channel, text, user, meta) {
     await channel.send({ embeds: [embed] });
 }
 
-export async function sendTextWebhook(channel, text, user) {
+export async function sendTextWebhook(channel, text, user, userAvatar) {
     var wh = await getHook(channel, user);
-    await wh.send({ content: text, username: user.username, avatar_url: user.displayAvatarURL() });
+    if (cfg.editAvatar) {
+        await wh.send({
+            content: text,
+            username: user.displayName,
+            avatarURL: userAvatar.editedUrl
+        });
+    }
+    else {
+        await wh.send({ content: text, username: user.displayName, avatarURL: user.displayAvatarURL() });
+    }
 }
 
-export function restoreMentions(text) {
-    var uidRegexp = /<\s*@\s*(.*?)\s*>/;
-    var mentionRegexp = /(<\s*@\s*.*?\s*>)/g;
-    var mentions = text.matchAll(mentionRegexp);
-
-    for (const match of mentions) {
-        var m = match[0];
-        var uid = m.match(uidRegexp)[1];
-        text = text.replace(m, `<@${uid}>`);
-    }
-
+export function prepareSpecial(text) {
+    var mentionsR = /(<\s*@\s*.*?\s*>)/g;
+    var emojisR = /<\s*:\s*[_~\-a-zA-Z0-9]*\s*:\s*.*?\s*>/g;
+    text = text.replace(mentionsR, '<span translate="no">$&</span>');
+    text = text.replace(emojisR, '<span translate="no">$&</span>');
     return text;
 }
 
+export function unwrapSpecial(text) {
+    var specialR = /\<span translate="no"\>(.*?)\<\/span\>/g;
+    text = text.replace(specialR, '$1');
+    return text;
+}
+
+
 export function makeEmbed(text, user, meta) {
     var embed = new MessageEmbed()
-        .setAuthor({ name: user.username, iconURL: user.displayAvatarURL() })
+        .setAuthor({ name: user.displayName, iconURL: user.displayAvatarURL() })
         .setDescription(text)
         //.addField('Message', text)
         //.setThumbnail(user.displayAvatarURL())
         .setFooter(meta);
     return embed;
+}
+
+export async function uploadAvatar(path, key) {
+    var fstream = fs.createReadStream(path);
+    const uploadParams = {
+        Bucket: appConfig.s3bucket,
+        Key: `img/${key}`,
+        Body: fstream
+    };
+    var res = await s3Client.send(new PutObjectCommand(uploadParams));
+}
+
+export async function download(url, path) {
+    const response = await axios({
+        url,
+        method: 'GET',
+        responseType: 'stream'
+    });
+    return new Promise((resolve, reject) => {
+        response.data.pipe(fs.createWriteStream(path))
+            .on('error', reject)
+            .once('close', () => resolve(path));
+    });
+}
+
+export async function createUserAvatar(user) {
+    var ff = await user.fetch(true);
+    var editedAvatar = await editAvatar(user.displayAvatarURL(), ff.hexAccentColor);
+    return { path: editedAvatar, uploaded: false };
+}
+
+export async function getUserAvatar(user) {
+    var hex = user.displayHexColor;
+    var ua = avatars.find(a => a.accent === hex && a.url === user.displayAvatarURL());
+    if (!ua) {
+        ua = {
+            accent: hex,
+            url: user.displayAvatarURL(),
+            uploaded: false
+        };
+        avatars.push(ua);
+    }
+
+    if (!ua.uploaded) {
+        var editedAvatar = await editAvatar(ua.url, hex);
+        var key = `${hex.substr(1)}_${editedAvatar.split('/').pop()}`;
+        await uploadAvatar(editedAvatar, key);
+        ua.editedUrl = `https://${appConfig.s3bucket}.s3.eu-central-1.amazonaws.com/img/${key}`;
+        ua.uploaded = true;
+        await saveAvatars();
+    }
+
+    return ua;
+}
+
+export async function editAvatar(url, color) {
+    var path = `./temp/${url.split('/').pop()}`;
+    await download(url, path);
+    var img = gm(path);
+
+    if (color !== "#000000") { // Treated as transparent by Discord
+        img.stroke(color, 30).fill("None").drawCircle(64, 64, 115, 115);
+    }
+    return new Promise((resolve, reject) => {
+        img.write(path, function (err) {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(path);
+            }
+        });
+    });
+}
+
+export function getEditAvatars() {
+    return cfg.editAvatar;
 }

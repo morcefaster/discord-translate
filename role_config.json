@@ -4,6 +4,11 @@
       "id": "991130648288964642",
       "name": "translatemetojapanese",
       "language": "ja"
+    },
+    {
+      "id":"991933645734551572",
+      "name":"ilikemandarins",
+      "language":"zh"
     }
   ],
   "bot_controller_role": "985069650087903242"

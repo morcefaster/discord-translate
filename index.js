@@ -91,9 +91,13 @@ async function log_error(interaction, error) {
 client.on("messageCreate", async (message) => {
     if (!message.author.bot && !message.webhookId) {
         try {
-            await tl.enforceLanguage(message);
-            await tl.mirrorMessage(message, client);
-            await tl.roleTranslate(message);
+            var avatar = null;
+            if (tl.getEditAvatars()) {
+                avatar = await tl.getUserAvatar(message.member);
+            }
+            await tl.enforceLanguage(message, avatar);
+            await tl.mirrorMessage(message, client, avatar);
+            await tl.roleTranslate(message, avatar);
         } catch (ex) {
             console.log(ex);
         }
@@ -103,8 +107,8 @@ client.on("messageCreate", async (message) => {
 client.login(config.token);
 
 client.on("ready", async () => {
-    client.user.setPresence({ game: { name: "everyone", type: "Listening" }, status: "online" });
+    client.user.setPresence({ activities: [{ name: 'with discord.js' }], status: 'idle' });
 });
 
-// client.on('debug', console.log);
+client.on('debug', console.log);
 
