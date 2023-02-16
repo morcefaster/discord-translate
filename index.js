@@ -95,9 +95,12 @@ client.on("messageCreate", async (message) => {
             if (tl.getEditAvatars()) {
                 avatar = await tl.getUserAvatar(message.member);
             }
-            await tl.enforceLanguage(message, avatar);
+            if (message.content.length > 0) {
+                var enforcedLanguage = await tl.enforceLanguage(message, avatar);
+                await tl.roleTranslate(message, avatar, enforcedLanguage);
+            }
+
             await tl.mirrorMessage(message, client, avatar);
-            await tl.roleTranslate(message, avatar);
         } catch (ex) {
             console.log(ex);
         }
@@ -107,7 +110,7 @@ client.on("messageCreate", async (message) => {
 client.login(config.token);
 
 client.on("ready", async () => {
-    client.user.setPresence({ activities: [{ name: 'with discord.js' }], status: 'idle' });
+    client.user.setPresence({ activities: [{ name: 'with myself' }], status: 'online' });
 });
 
 client.on('debug', console.log);

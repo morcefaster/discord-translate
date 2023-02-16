@@ -72,11 +72,17 @@ export async function translateToCommand(interaction) {
         case "translate to english":
             target = "en";
             break;
-        case "translate to korean":
-            target = "ko";
+        case "translate to german":
+            target = "de";
             break;
-        case "translate to traditional chinese":
-            target = "zh-TW";
+        case "translate to spanish":
+            target = "es";
+            break;
+        case "translate to italian":
+            target = "it";
+            break;
+        case "translate to japanese":
+            target = "ja";
             break;
         default:
             await interaction.reply({ content: "Unknown target language.", ephemeral: true });
@@ -205,14 +211,14 @@ export async function detectLanguage(text) {
 }
 
 export async function translateMessage(interaction) {
-    var text = interaction.options.getString("text");
+    var text = interaction.options.getString("text");    
     var target = interaction.options.getString("target");
     var lc = languages.find(l => l.code.toLowerCase() === target || l.name.toLowerCase() === target);
     if (!lc) {
         await interaction.reply({ content: `Cannot find language ${target}.`, ephemeral: true });
         return;
     }
-
+       
     var tl = await translate(text, lc.code);
     await interaction.reply({ content: tl });
 }
@@ -291,21 +297,26 @@ export async function getHook(channel, user) {
 }
 
 export async function enforceLanguage(message, userAvatar) {
-    if (!cfg.enabled) return;
+    if (!cfg.enabled) return false;
 
     var cc = getChannelConfig(message.channel);
     if (!cc.enforceLanguage) {
-        return;
+        return false;
     }
+    
     var textLang = await detectLanguage(message.content);
     if (textLang && textLang.Score > LANG_THRESHOLD && textLang.LanguageCode !== cc.language) {
-        var text = await translate(message.content, cc.language);
+        var text = ""
+        if (message.content && message.content.length > 0) {
+            text = await translate(message.content, cc.language);
+        }
         var langName = languages.find(l => l.code === textLang.LanguageCode).name;
         await sendText(message.channel, text, message.member, userAvatar, { text: `Translated from ${langName}` });
     }
+    return cc.language;
 }
 
-export async function roleTranslate(message, userAvatar) {
+export async function roleTranslate(message, userAvatar, enforcedLanguage) {
     if (!cfg.enabled) return;
 
     if (!cfg.roleTl) return;
@@ -321,8 +332,11 @@ export async function roleTranslate(message, userAvatar) {
     }
     
     for (var rt of translateTo) {
-        if (textLang.LanguageCode !== rt.language) {
-            var text = await translate(message.content, rt.language);
+        if (textLang.LanguageCode !== rt.language && rt.language !== enforcedLanguage) {
+            var text = ""
+            if (message.content && message.content.length > 0) {
+                text = await translate(message.content, rt.language);
+            }
             var langName = languages.find(l => l.code === textLang.LanguageCode).name;
             await sendText(message.channel, text, message.member, userAvatar, { text: `Translated from ${langName}` });
         }
@@ -337,46 +351,61 @@ export async function mirrorMessage(message, client, userAvatar) {
         return;
     }
 
-    var textLang = cfg.mirrorTl ? await detectLanguage(message.content) : null;
+    var textLang = cfg.mirrorTl ? (message.content? await detectLanguage(message.content):null) : null;
     var channels = cfg.channels.filter(c => c.groupName === cc.groupName && c.id !== cc.id);
 
     var origin = `Mirrored from channel ${message.channel.name}.`;
 
     for (var ch of channels) {
         var text = message.content;
-        if (cfg.mirrorTl) {
-            if (textLang.Score > LANG_THRESHOLD && ch.language !== textLang.LanguageCode) {
-                text = await translate(message.content, ch.language);
+        if (!message.content) {
+            text = "[embed only]";
+        }
+        var attachments = message.attachments;
+        if (cfg.mirrorTl && message.content) {
+            if (textLang.Score > LANG_THRESHOLD && ch.language !== textLang.LanguageCode) {                
+                if (message.content && message.content.length > 0) {
+                    text = await translate(message.content, ch.language);
+                }
                 var langName = languages.find(l => l.code === textLang.LanguageCode).name;
                 origin = `Translated from ${langName}`;
             }
         }
 
         var channel = await client.channels.fetch(ch.id);
-        await sendText(channel, text, message.member, userAvatar, { text: origin });
+        console.log(JSON.stringify(attachments));
+        await sendText(channel, text, message.member, userAvatar, { text: origin }, attachments);
     }
 }
 
-export async function sendText(channel, text, user, userAvatar, meta) {
+export async function sendText(channel, text, user, userAvatar, meta, attachments=null) {
     if (cfg.mirrorMode === "embed") {
         sendTextEmbed(channel, text, user, meta);
     } else {
-        sendTextWebhook(channel, text, user, userAvatar);
+        sendTextWebhook(channel, text, attachments, user, userAvatar);
     }
 }
 
 export async function sendTextEmbed(channel, text, user, meta) {
+    if (text.length > 2000) {
+        text = text.substr(0, 1999);
+    }
     var embed = makeEmbed(text, user, meta);
     await channel.send({ embeds: [embed] });
 }
 
-export async function sendTextWebhook(channel, text, user, userAvatar) {
+export async function sendTextWebhook(channel, text, attachments, user, userAvatar) {
     var wh = await getHook(channel, user);
+    if (text.length > 2000) {
+        text = text.substr(0, 1999);
+    }
     if (cfg.editAvatar) {
+
         await wh.send({
             content: text,
             username: user.displayName,
-            avatarURL: userAvatar.editedUrl
+            avatarURL: userAvatar.editedUrl,
+            files: attachments?.map(a=>a.attachment)
         });
     }
     else {
