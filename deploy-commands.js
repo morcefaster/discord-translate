@@ -9,8 +9,10 @@ const config = require('./config.json');
 const commands = [
     new ContextMenuCommandBuilder().setName('Detect language').setType(ApplicationCommandType.Message),
     new ContextMenuCommandBuilder().setName('Translate to English').setType(ApplicationCommandType.Message),
-    new ContextMenuCommandBuilder().setName('Translate to Korean').setType(ApplicationCommandType.Message),
-    new ContextMenuCommandBuilder().setName('Translate to Traditional Chinese').setType(ApplicationCommandType.Message),
+    new ContextMenuCommandBuilder().setName('Translate to Japanese').setType(ApplicationCommandType.Message),
+  //  new ContextMenuCommandBuilder().setName('Translate to German').setType(ApplicationCommandType.Message),
+  //  new ContextMenuCommandBuilder().setName('Translate to Spanish').setType(ApplicationCommandType.Message),
+  //  new ContextMenuCommandBuilder().setName('Translate to Italian').setType(ApplicationCommandType.Message),
     new SlashCommandBuilder().setName('translate').setDescription("Translate text using AWS Translate.")
 		.addStringOption(option=>option.setName("text").setDescription("Text to translate").setRequired(true))
 		.addStringOption(option => option.setName("target").setDescription("Target language or language code").setRequired(true)),
