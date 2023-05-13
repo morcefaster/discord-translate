@@ -18,7 +18,7 @@ const AVATAR_DB_FILENAME = './avatars.json';
 var cfg = require(CHANNEL_CONFIG_FILENAME);
 var avatars = require(AVATAR_DB_FILENAME);
 
-const LANG_THRESHOLD = 0.7;
+const LANG_THRESHOLD = 0.6;
 const tlClient = new TranslateClient({ region: "eu-central-1" });
 const chClient = new ComprehendClient({ region: "eu-central-1" });
 const s3Client = new S3Client({ region: "eu-central-1" });
@@ -70,19 +70,31 @@ export async function translateToCommand(interaction) {
     var target;
     switch(interaction.commandName.toLowerCase()) {
         case "translate to english":
+        case "translate to en":
             target = "en";
             break;
         case "translate to german":
+        case "translate to de":
             target = "de";
             break;
         case "translate to spanish":
+        case "translate to es":
             target = "es";
             break;
         case "translate to italian":
+        case "translate to it":
             target = "it";
             break;
         case "translate to japanese":
+        case "translate to jp":
             target = "ja";
+            break;
+        case "translate to korean":
+        case "translate to kr":
+            target = "ko";
+            break;
+        case "translate to tw":
+            target = "zh-TW";
             break;
         default:
             await interaction.reply({ content: "Unknown target language.", ephemeral: true });
