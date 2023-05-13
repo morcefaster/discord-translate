@@ -8,8 +8,10 @@ const config = require('./config.json');
 
 const commands = [
     new ContextMenuCommandBuilder().setName('Detect language').setType(ApplicationCommandType.Message),
-    new ContextMenuCommandBuilder().setName('Translate to English').setType(ApplicationCommandType.Message),
-    new ContextMenuCommandBuilder().setName('Translate to Japanese').setType(ApplicationCommandType.Message),
+    new ContextMenuCommandBuilder().setName('Translate to EN').setType(ApplicationCommandType.Message),    
+    new ContextMenuCommandBuilder().setName('Translate to KR').setType(ApplicationCommandType.Message),    
+    new ContextMenuCommandBuilder().setName('Translate to TW').setType(ApplicationCommandType.Message),
+    new ContextMenuCommandBuilder().setName('Translate to JP').setType(ApplicationCommandType.Message),    
   //  new ContextMenuCommandBuilder().setName('Translate to German').setType(ApplicationCommandType.Message),
   //  new ContextMenuCommandBuilder().setName('Translate to Spanish').setType(ApplicationCommandType.Message),
   //  new ContextMenuCommandBuilder().setName('Translate to Italian').setType(ApplicationCommandType.Message),
